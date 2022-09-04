@@ -5,7 +5,7 @@ main.py: Entry point of the Server.
 """
 
 import utils
-import server
+import servermanager
 PORT_INFO = 'port.info'
 
 
@@ -26,4 +26,4 @@ if __name__ == '__main__':
     if port is None:
         utils.stopServer(f"Failed to parse int port from '{PORT_INFO}")
 
-    server.Server(server_port=port, host="").start()
+    server.ServerManager(server_port=port, host="").start()
