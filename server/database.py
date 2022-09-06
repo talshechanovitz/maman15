@@ -2,6 +2,16 @@ import sqlite3
 from sqlite3 import Error
 
 
+class Client:
+    """ Represents a client entry """
+
+    def __init__(self, cid, cname, public_key, last_seen):
+        self.ID = bytes.fromhex(cid)  # Unique client ID, 16 bytes.
+        self.Name = cname  # Client's name, null terminated ascii string, 255 bytes.
+        self.PublicKey = public_key  # Client's public key, 160 bytes.
+        self.LastSeen = last_seen  # The Date & time of client's last request.
+
+
 class Database:
     CLIENTS = "clients"
     FILES = "files"
@@ -69,6 +79,11 @@ class Database:
         if not results:
             return False
         return len(results) > 0
+
+    def storeClient(self, clnt: Client):
+        """ Store a client into database """
+        return self.execute(f"INSERT INTO {Database.CLIENTS} VALUES (?, ?, ?, ?)",
+                            [clnt.ID, clnt.Name, clnt.PublicKey, clnt.LastSeen], True)
 
     def client_id_exists(self, client_id):
         """ Check whether an client ID already exists within database """
