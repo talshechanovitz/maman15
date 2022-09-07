@@ -1,8 +1,10 @@
 import struct
+from datetime import datetime
 from uuid import UUID
 
-import database
-from request import RequestHeader,RequestOp
+from database import Database,Client
+from storage_on_memory import MemoryStorage
+from request import RequestHeader, RequestOp
 from servermanager import ServerManager, ClientThread
 import logging
 
@@ -18,8 +20,9 @@ class FileManager:
     FILENAME_LEN = 1
 
     def __init__(self, server_port: int):
-        self.database = database.Database(FileManager.DATABASE)
+        self._database = Database(FileManager.DATABASE)
         self._server = ServerManager(server_port=server_port, connection_handle=self._connection_handle)
+        self._memory_storage = MemoryStorage()
 
     def _parse_request(self, client_thread: ClientThread) -> RequestHeader:
         logging.info("A client has connected.")
@@ -54,6 +57,40 @@ class FileManager:
                 filename_len = int(client_thread.recv(FileManager.FILENAME_LEN))
                 filename = client_thread.recv(filename_len)
                 return RequestHeader.upload_file(client_uuid, client_version, filename)
+            case RequestOp.CRC_EQUAL:
+                return RequestHeader.crc_ok(client_uuid, client_version)
+
+    def _handle_registration(self, request: RequestHeader):
+        username = request.payload.decode()
+        if self._memory_storage.user_is_exist(username):
+            logging.error(f"Cannot register this user {username} with uuid {request.clientID} "
+                          f"because he is already registered")
+            return
+        logging.info(f"Register new user {username}:{request.clientID}")
+        self._memory_storage.add_user_to_memory(username=username,client_uuid=request.clientID)
+        if not self._database.client_username_exists(username=username):
+            client = Client(cid=request.clientID, cname=username, public_key=None, last_seen=str(datetime.now()))
+            self._database.storeClient(clnt=client)
+            logging.info("Registered new Client to DB")
+        return
+
+    def _handle_request_key(self, request: RequestHeader):
+        pass
+
+    def _handle_upload_file(self, request):
+        pass
+
+    def _handle_crc_equal(self, request):
+        pass
 
     def _connection_handle(self, client_thread: ClientThread):
         request = self._parse_request(client_thread)
+        match request.request_type:
+            case RequestOp.REQUEST_REGISTRATION:
+                self._handle_registration(request)
+            case RequestOp.REQUEST_PUBLIC_KEY:
+                self._handle_request_key(request)
+            case RequestOp.UPLOAD_FILE:
+                self._handle_upload_file(request)
+            case RequestOp.CRC_EQUAL:
+                self._handle_crc_equal(request)

@@ -85,7 +85,7 @@ class Database:
         return self.execute(f"INSERT INTO {Database.CLIENTS} VALUES (?, ?, ?, ?)",
                             [clnt.ID, clnt.Name, clnt.PublicKey, clnt.LastSeen], True)
 
-    def client_id_exists(self, client_id):
+    def client_id_exists(self, client_id) -> bool:
         """ Check whether an client ID already exists within database """
         results = self.execute(f"SELECT * FROM {Database.CLIENTS} WHERE ID = ?", [client_id])
         if not results:

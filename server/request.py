@@ -9,10 +9,11 @@ class RequestOp(Enum):
     """
     File server operation types
     """
-    REQUEST_REGISTRATION = 203  # uuid ignored.
+    REQUEST_REGISTRATION = 203
     REQUEST_PUBLIC_KEY = 204
     UPLOAD_FILE = 201
     UNKNOWN = 205
+    CRC_EQUAL = 202
 
 
 # region constants
@@ -42,16 +43,20 @@ def upload_file(client_uuid: UUID, client_version, payload):
                          request_type=RequestOp.UPLOAD_FILE, payload=payload)
 
 
+def crc_ok(client_uuid: UUID, client_version):
+    return RequestHeader(client_uuid=client_uuid, client_version=client_version, request_type=RequestOp.CRC_EQUAL)
+
+
 class RequestHeader:
     """
     File server request object, can store and encode request items
     """
 
-    def __init__(self, client_uuid: UUID, client_version, request_type, payload):
-        self.payload = payload  # 4 bytes
-        self._clientID = client_uuid
-        self._version = client_version  # 1 byte
-        self._request_type = request_type
+    def __init__(self, client_uuid: UUID, client_version, request_type, payload=b''):
+        self.payload = payload # 4 bytes
+        self.clientID = client_uuid
+        self.version = client_version  # 1 byte
+        self.request_type = request_type
 
     @classmethod
     def handle_registration_request(cls, client_uuid, client_version, username):
@@ -63,4 +68,8 @@ class RequestHeader:
 
     @classmethod
     def upload_file(cls, client_uuid, client_version, file_name):
+        pass
+
+    @classmethod
+    def crc_ok(cls, client_uuid, client_version):
         pass
