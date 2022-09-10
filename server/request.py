@@ -53,5 +53,6 @@ class RequestHeader:
                              request_type=RequestOp.UPLOAD_FILE, payload=file_name)
 
     @classmethod
-    def crc_ok(cls, client_uuid, client_version):
-        return RequestHeader(client_uuid=client_uuid, client_version=client_version, request_type=RequestOp.CRC_EQUAL)
+    def crc_ok(cls, client_uuid, client_version, file_name):
+        return RequestHeader(client_uuid=client_uuid, client_version=client_version, request_type=RequestOp.CRC_EQUAL,
+                             payload=file_name)

@@ -4,7 +4,6 @@ from sqlite3 import Error
 import string
 from uuid import UUID
 
-
 class Client:
     """ Represents a client entry """
 
@@ -21,9 +20,9 @@ class File:
     """
     Represents a File entry
     """
-    def __init__(self, cid: UUID, file_name: string, path_name: string, verified: bool):
+    def __init__(self, cid: UUID, file_name, path_name: string, verified: int):
         self.id = cid.bytes  # Unique client ID, 16 bytes.
-        self.file_name = file_name
+        self.file_name = file_name.decode()
         self.path_name = path_name
         self.verified = verified
 
@@ -46,12 +45,11 @@ class Database:
             );
             """)
         # Try to create Files table
-        self.executescript(f"""
-                   CREATE TABLE {Database.FILES}(
+        self.executescript(f""" CREATE TABLE {Database.FILES}(
                      ID BLOB(16) PRIMARY KEY,
                      FileName CHAR(255) NOT NULL,
                      FilePath CHAR(255) NOT NULL,
-                     Verified BOOLEAN NOT NULL CHECK (Verified IN (0, 1)
+                     Verified INTEGER DEFAULT 0
                    );
                    """)
 
@@ -108,8 +106,8 @@ class Database:
     def find_public_key_by_id(self, client_id):
         return self.execute(f"select PublicKey from {Database.CLIENTS} where id = ?", [client_id])
 
-    def find_aes_key(self, client_id):
-        return self.execute(f"select KeyAES from {Database.CLIENTS} where id = ?", [client_id])
+    def find_aes_key(self, client_id: UUID):
+        return self.execute(f"select KeyAES from {Database.CLIENTS} where id = ?", [client_id.bytes])
 
     def store_file(self, file: File):
         """ Store a client into database """
@@ -117,7 +115,7 @@ class Database:
                             [file.id, file.file_name, file.path_name, file.verified], True)
 
     def client_id_exists(self, client_id) -> bool:
-        """ Check whether an client ID already exists within database """
+        """ Check whether if client ID already exists within database """
         results = self.execute(f"SELECT * FROM {Database.CLIENTS} WHERE ID = ?", [client_id])
         if not results:
             return False
@@ -126,3 +124,6 @@ class Database:
     def update_memory_status(self):
         return self.execute(f"SELECT ID, Name FROM {Database.CLIENTS}", [])
 
+    def update_crc(self, id_user: UUID, file_name):
+        return self.execute(f"Update {Database.FILES} set Verified = ? where ID = ? AND FileName = ?",
+                            [1, id_user.bytes, file_name], True)

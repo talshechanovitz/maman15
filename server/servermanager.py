@@ -22,6 +22,7 @@ class ServerManager:
     SERVER_VERSION = 3
     USERNAME_LEN = 1
     CLIENT_VERSION_LEN = 1
+    FILE_SIZE = 4
     REQUEST_TYPE_LEN = 1
     PUBLIC_KEY_LEN = 162
     FILENAME_LEN = 1
@@ -67,11 +68,15 @@ class ServerManager:
                 public_key = client_thread.recv(ServerManager.PUBLIC_KEY_LEN)
                 return RequestHeader.exchange_keys(client_uuid, client_version, public_key)
             case RequestOp.UPLOAD_FILE.value:
-                filename_len = int(client_thread.recv(ServerManager.FILENAME_LEN))
+                filename_len = int.from_bytes(client_thread.recv(ServerManager.FILENAME_LEN),
+                                              byteorder='big', signed=False)
                 filename = client_thread.recv(filename_len)
                 return RequestHeader.upload_file(client_uuid, client_version, filename)
             case RequestOp.CRC_EQUAL.value:
-                return RequestHeader.crc_ok(client_uuid, client_version)
+                data = client_thread.recv(ServerManager.FILENAME_LEN)
+                file_name_len = struct.unpack('<B', data)[0]
+                file_name = client_thread.recv(file_name_len).decode()
+                return RequestHeader.crc_ok(client_uuid, client_version, file_name)
 
     def _handle_registration(self, request: RequestHeader):
         username = request.payload.decode()
@@ -88,6 +93,11 @@ class ServerManager:
         logging.info("Registered new Client to DB")
         return Response.register_success(ServerManager.SERVER_VERSION, uuid)
 
+    def _handle_crc_equal(self, request: RequestHeader):
+        self._database.update_crc(request.clientID, request.payload)
+        if request.request_type is RequestOp.CRC_EQUAL.value:
+            return Response.general_success(ServerManager.SERVER_VERSION)
+
     def _handle_request_key(self, request: RequestHeader):
         aes_key = get_random_bytes(16)
         rsa_key = RSA.importKey(request.payload)
@@ -95,22 +105,42 @@ class ServerManager:
         encrypte = cipher_rsa.encrypt(aes_key)
         self._database.store_public_key(client_id=request.clientID, public_key=request.payload, aes_key=aes_key)
         logging.info(f"Update public key:{request.payload} in table: Clients")
-        return Response.exchange_keypair(ServerManager.SERVER_VERSION, aes_key)
+        return Response.exchange_keypair(ServerManager.SERVER_VERSION, encrypte)
 
     def _handle_upload_file(self, request: RequestHeader, c: ClientThread):
         file_name = request.payload
-        file_path = fr'{request.clientID}\{file_name}'
-        file_obj = File(request.clientID, file_name=file_name, path_name=file_path, verified=False)
-        self._database.store_file(file_obj)
+        file_path = fr'\files\{request.clientID}\{file_name.decode()}'
+        file_obj = File(request.clientID, file_name=file_name, path_name=file_path, verified=0)
+        if not self._database.store_file(file_obj):
+            logging.error(f'Cannot loading file {file_name} for the use {request.clientID}')
+            return Response.general_error(ServerManager.SERVER_VERSION)
         iv = c.recv(ServerManager.IV_SIZE)
         aes_key = self._database.find_aes_key(client_id=request.clientID)
-        cipher = AES.new(aes_key, AES.MODE_CBC, iv)
-        next_data = None
-        prev_crc = 0
-
+        cipher = AES.new(aes_key[0][0], AES.MODE_CBC, iv)
+        next_data = b''
+        is_done = False
+        crc = 0
+        file_size = c.recv(ServerManager.FILE_SIZE)
+        read_bytes_left = struct.unpack('<I', file_size)[0]
+        try:
+            with open(file_path, 'wb') as f:
+                while not is_done:
+                    how_much_to_read = min(ServerManager.STREAM_BUFFER, read_bytes_left)
+                    data, next_data = next_data, c.recv(how_much_to_read)
+                    next_data = cipher.decrypt(next_data)
+                    if not next_data:
+                        padding_length = data[-1]
+                        data = data[:-padding_length]
+                        is_done = True
+                    f.write(data)
+                    read_bytes_left -= len(next_data)
+                    print(f"Bytes left to read:{read_bytes_left}")
+                    crc = zlib.crc32(data, crc)
+        except Exception as e:
+            pass
+        return crc
 
     def _connection_handle(self, client_thread: ClientThread):
-
         request = self._parse_request(client_thread)
         res = None
         match request.request_type:
@@ -119,10 +149,11 @@ class ServerManager:
             case RequestOp.REQUEST_PUBLIC_KEY:
                 res = self._handle_request_key(request)
             case RequestOp.UPLOAD_FILE:
-                res = self._handle_upload_file(request, client_thread)
-            # case RequestOp.CRC_EQUAL:
-            #     self._handle_crc_equal(request)
-        print(res.response_status())
+                crc = self._handle_upload_file(request, client_thread)
+                crc_bytes = struct.pack('<I', crc)
+                res = Response(ServerManager.SERVER_VERSION, ResponseOp.UPLOAD_FILE, crc_bytes)
+            case RequestOp.CRC_EQUAL:
+                self._handle_crc_equal(request)
         self._send_response(res, client_thread)
 
     @staticmethod

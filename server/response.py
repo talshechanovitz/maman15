@@ -12,6 +12,7 @@ class ResponseOp(Enum):
     UPLOAD_FILE = 105
     CRC_EQUAL = 103
     RESPONSE_ERROR = 104
+    File_IS_ALREADY_EXIST = 106
 
 
 class Response:
@@ -47,6 +48,10 @@ class Response:
 
     @classmethod
     def general_error(cls, server_version: int):
+        return Response(server_version, ResponseOp.RESPONSE_ERROR)
+
+    @classmethod
+    def general_success(cls, server_version: int):
         return Response(server_version, ResponseOp.RESPONSE_ERROR)
 
     def response_status(self) -> ResponseOp:
