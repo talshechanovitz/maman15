@@ -1,15 +1,31 @@
 import sqlite3
+from datetime import datetime
 from sqlite3 import Error
+import string
+from uuid import UUID
 
 
 class Client:
     """ Represents a client entry """
 
-    def __init__(self, cid, cname, public_key, last_seen):
-        self.ID = bytes.fromhex(cid)  # Unique client ID, 16 bytes.
+    def __init__(self, cid: UUID, cname, public_key, last_seen, aes_key):
+        self.ID = cid.bytes  # Unique client ID, 16 bytes.
         self.Name = cname  # Client's name, null terminated ascii string, 255 bytes.
         self.PublicKey = public_key  # Client's public key, 160 bytes.
-        self.LastSeen = last_seen  # The Date & time of client's last request.
+        self.last_seen = last_seen
+        self.aes_key = aes_key
+        # The Date & time of client's last request.
+
+
+class File:
+    """
+    Represents a File entry
+    """
+    def __init__(self, cid: UUID, file_name: string, path_name: string, verified: bool):
+        self.id = cid.bytes  # Unique client ID, 16 bytes.
+        self.file_name = file_name
+        self.path_name = path_name
+        self.verified = verified
 
 
 class Database:
@@ -22,17 +38,17 @@ class Database:
     def initialize(self):
         # create clients table
         self.executescript(f""" CREATE TABLE {Database.CLIENTS}(
-              ID CHAR(16) NOT NULL PRIMARY KEY,
-              Name CHAR(127) NOT NULL,
-              PublicKey CHAR(160) NOT NULL,
+              ID BLOB(16) NOT NULL PRIMARY KEY,
+              Name CHAR(127),
+              PublicKey BLOB(162),
               LastSeen DATE,
-              keyAES CHAR(256) 
+              KeyAES BLOB(16) 
             );
             """)
         # Try to create Files table
         self.executescript(f"""
                    CREATE TABLE {Database.FILES}(
-                     ID INTEGER PRIMARY KEY,
+                     ID BLOB(16) PRIMARY KEY,
                      FileName CHAR(255) NOT NULL,
                      FilePath CHAR(255) NOT NULL,
                      Verified BOOLEAN NOT NULL CHECK (Verified IN (0, 1)
@@ -80,10 +96,25 @@ class Database:
             return False
         return len(results) > 0
 
-    def storeClient(self, clnt: Client):
+    def store_client(self, clnt: Client):
         """ Store a client into database """
-        return self.execute(f"INSERT INTO {Database.CLIENTS} VALUES (?, ?, ?, ?)",
-                            [clnt.ID, clnt.Name, clnt.PublicKey, clnt.LastSeen], True)
+        return self.execute(f"INSERT INTO {Database.CLIENTS} VALUES (?, ?, ?, ?, ?)",
+                            [clnt.ID, clnt.Name, clnt.PublicKey, clnt.last_seen, clnt.aes_key], True)
+
+    def store_public_key(self, client_id: UUID, public_key, aes_key):
+        return self.execute(f"Update {Database.CLIENTS} set PublicKey = ?, KeyAES = ?, LastSeen = ? where id = ?",
+                            [public_key, aes_key, datetime.now(), client_id.bytes], True)
+
+    def find_public_key_by_id(self, client_id):
+        return self.execute(f"select PublicKey from {Database.CLIENTS} where id = ?", [client_id])
+
+    def find_aes_key(self, client_id):
+        return self.execute(f"select KeyAES from {Database.CLIENTS} where id = ?", [client_id])
+
+    def store_file(self, file: File):
+        """ Store a client into database """
+        return self.execute(f"INSERT INTO {Database.FILES} VALUES (?, ?, ?, ?)",
+                            [file.id, file.file_name, file.path_name, file.verified], True)
 
     def client_id_exists(self, client_id) -> bool:
         """ Check whether an client ID already exists within database """
@@ -91,4 +122,7 @@ class Database:
         if not results:
             return False
         return len(results) > 0
+
+    def update_memory_status(self):
+        return self.execute(f"SELECT ID, Name FROM {Database.CLIENTS}", [])
 

@@ -1,8 +1,6 @@
 import logging
 from enum import Enum
-from typing import Optional
 from uuid import UUID
-import database
 
 
 class RequestOp(Enum):
@@ -23,28 +21,9 @@ NAME_LEN_MIN = 1
 NAME_LEN_MAX = 0xffff
 PAYLOAD_SIZE_MIN = 0
 PAYLOAD_SIZE_MAX = 0xffffffff
-
+STREAM_BUFFER = 4096
 
 # endregion
-
-
-def handle_registration_request(client_uuid, client_version, payload):
-    return RequestHeader(client_uuid=client_uuid, client_version=client_version,
-                         request_type=RequestOp.REQUEST_REGISTRATION, payload=payload)
-
-
-def exchange_keys(client_uuid: UUID, client_version, payload):
-    return RequestHeader(client_uuid=client_uuid, client_version=client_version,
-                         request_type=RequestOp.REQUEST_PUBLIC_KEY, payload=payload)
-
-
-def upload_file(client_uuid: UUID, client_version, payload):
-    return RequestHeader(client_uuid=client_uuid, client_version=client_version,
-                         request_type=RequestOp.UPLOAD_FILE, payload=payload)
-
-
-def crc_ok(client_uuid: UUID, client_version):
-    return RequestHeader(client_uuid=client_uuid, client_version=client_version, request_type=RequestOp.CRC_EQUAL)
 
 
 class RequestHeader:
@@ -53,23 +32,26 @@ class RequestHeader:
     """
 
     def __init__(self, client_uuid: UUID, client_version, request_type, payload=b''):
-        self.payload = payload # 4 bytes
+        self.payload = payload  # 4 bytes
         self.clientID = client_uuid
         self.version = client_version  # 1 byte
         self.request_type = request_type
 
     @classmethod
     def handle_registration_request(cls, client_uuid, client_version, username):
-        pass
+        return RequestHeader(client_uuid=client_uuid, client_version=client_version,
+                             request_type=RequestOp.REQUEST_REGISTRATION, payload=username)
 
     @classmethod
     def exchange_keys(cls, client_uuid, client_version, public_key):
-        pass
+        return RequestHeader(client_uuid=client_uuid, client_version=client_version,
+                             request_type=RequestOp.REQUEST_PUBLIC_KEY, payload=public_key)
 
     @classmethod
     def upload_file(cls, client_uuid, client_version, file_name):
-        pass
+        return RequestHeader(client_uuid=client_uuid, client_version=client_version,
+                             request_type=RequestOp.UPLOAD_FILE, payload=file_name)
 
     @classmethod
     def crc_ok(cls, client_uuid, client_version):
-        pass
+        return RequestHeader(client_uuid=client_uuid, client_version=client_version, request_type=RequestOp.CRC_EQUAL)
