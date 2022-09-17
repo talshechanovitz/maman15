@@ -14,18 +14,6 @@ class RequestOp(Enum):
     CRC_EQUAL = 202
 
 
-# region constants
-USER_ID_MIN = 0
-USER_ID_MAX = 0xffffffff
-NAME_LEN_MIN = 1
-NAME_LEN_MAX = 0xffff
-PAYLOAD_SIZE_MIN = 0
-PAYLOAD_SIZE_MAX = 0xffffffff
-STREAM_BUFFER = 4096
-
-# endregion
-
-
 class RequestHeader:
     """
     File server request object, can store and encode request items

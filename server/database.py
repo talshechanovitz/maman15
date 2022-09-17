@@ -22,7 +22,7 @@ class File:
     """
     def __init__(self, cid: UUID, file_name, path_name: string, verified: int):
         self.id = cid.bytes  # Unique client ID, 16 bytes.
-        self.file_name = file_name.decode()
+        self.file_name = file_name
         self.path_name = path_name
         self.verified = verified
 

@@ -13,6 +13,7 @@ class ResponseOp(Enum):
     CRC_EQUAL = 103
     RESPONSE_ERROR = 104
     File_IS_ALREADY_EXIST = 106
+    GENERAL_SUCCESS = 107
 
 
 class Response:
@@ -23,7 +24,8 @@ class Response:
 
     def to_buffer(self) -> bytes:
         buffer = struct.pack('<B', self._server_version)
-        buffer += struct.pack('<B', self._response_status.value)
+        buffer += struct.pack('<H', self._response_status.value)
+        buffer += struct.pack('<B', len(self._payload))
         buffer += self._payload
         return buffer
 
@@ -52,7 +54,7 @@ class Response:
 
     @classmethod
     def general_success(cls, server_version: int):
-        return Response(server_version, ResponseOp.RESPONSE_ERROR)
+        return Response(server_version, ResponseOp.GENERAL_SUCCESS)
 
     def response_status(self) -> ResponseOp:
         return self._response_status
