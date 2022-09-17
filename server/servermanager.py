@@ -112,10 +112,10 @@ class ServerManager:
         aes_key = get_random_bytes(16)
         rsa_key = RSA.importKey(request.payload)
         cipher_rsa = PKCS1_OAEP.new(rsa_key)
-        encrypte = cipher_rsa.encrypt(aes_key)
+        encrypt = cipher_rsa.encrypt(aes_key)
         self._database.store_public_key(client_id=request.clientID, public_key=request.payload, aes_key=aes_key)
         logging.info(f"Update public key:{request.payload} in table: Clients")
-        return Response.exchange_keypair(ServerManager.SERVER_VERSION, encrypte)
+        return Response.exchange_keypair(ServerManager.SERVER_VERSION, encrypt)
 
     def _handle_upload_file(self, request: RequestHeader, c: ClientThread):
         file_name = request.payload
@@ -136,11 +136,11 @@ class ServerManager:
             with open(file_path, 'wb') as f:
                 while len(data) <= read_bytes_left:
                     data = c.recv(ServerManager.STREAM_BUFFER)
-                    decrypte_data = cipher.decrypt(data)
-                    decrypte_data = decrypte_data[:read_bytes_left]
-                    f.write(decrypte_data)
-                    crc = zlib.crc32(decrypte_data)
-                    read_bytes_left -= len(decrypte_data)
+                    decrypt_data = cipher.decrypt(data)
+                    decrypt_data = decrypt_data[:read_bytes_left]
+                    f.write(decrypt_data)
+                    crc = zlib.crc32(decrypt_data)
+                    read_bytes_left -= len(decrypt_data)
                     logging.info(f"Bytes left to read:{read_bytes_left}")
         except Exception as e:
             pass
